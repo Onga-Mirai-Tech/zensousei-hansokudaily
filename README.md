@@ -1,0 +1,2 @@
+# zensousei-hansokudayly
+全曹青総合企画委員会販促物の売り上げ日報作成アプリです
