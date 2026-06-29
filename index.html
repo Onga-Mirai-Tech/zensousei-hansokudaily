@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>販促物計算表</title>
+  
+  <!-- Tailwind CSS (デザイン用) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM (ロジック用) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザ内でReactコードを変換して実行するため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- カスタムアニメーション設定 -->
+  <style>
+    /* フェードインアニメーション */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    
+    /* トースト通知用アニメーション */
+    @keyframes toastEnter {
+      from { opacity: 0; transform: translate(-50%, 20px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .toast-enter {
+      animation: toastEnter 0.3s ease-out forwards;
+    }
+    
+    /* モーダル用アニメーション */
+    @keyframes zoomIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-zoom-in {
+      animation: zoomIn 0.2s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  
+  <!-- アプリの描画先 -->
+  <div id="root"></div>
+
+  <!-- アプリケーションのコード -->
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    // ==========================================
+    // 1. アイコンコンポーネント (Lucideアイコンの代用)
+    // ==========================================
+    const Icon = ({ children, size = 24, className = "", strokeWidth = 2 }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+
+    const RotateCcw = (props) => <Icon {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></Icon>;
+    const Plus = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+    const Minus = (props) => <Icon {...props}><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+    const ClipboardList = (props) => <Icon {...props}><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>;
+    const Coins = (props) => <Icon {...props}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></Icon>;
+    const CheckCircle2 = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></Icon>;
+    const AlertTriangle = (props) => <Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></Icon>;
+    const Save = (props) => <Icon {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Icon>;
+    const Copy = (props) => <Icon {...props}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></Icon>;
+
+
+    // ==========================================
+    // 2. データ定義
+    // ==========================================
+    const INITIAL_DATA = [
+      { no: 1, name: '写経用紙『般若心経』', price: 150 },
+      { no: 2, name: '写経用紙『舎利』', price: 150 },
+      { no: 3, name: '写経用紙『消災呪』', price: 150 },
+      { no: 4, name: '写経用紙『普門品偈』', price: 150 },
+      { no: 5, name: '写経用紙『三宝御和讃』', price: 150 },
+      { no: 6, name: '写経用紙『御詠歌』', price: 150 },
+      { no: 7, name: '写仏『三仏忌』', price: 300 },
+      { no: 8, name: '写経用下敷き', price: 1000 },
+      { no: 9, name: '一筆箋', price: 100 },
+      { no: 10, name: 'DVD『祈祷太鼓』', price: 2500 },
+      { no: 11, name: 'DVD『華燭之典』', price: 3000 },
+      { no: 12, name: 'DVD『出班焼香』', price: 2500 },
+      { no: 13, name: 'DVD『声明の手引き』', price: 2500 },
+      { no: 14, name: '僧侶の英会話', price: 500 },
+      { no: 15, name: '坐禅で使える僧侶の英会話', price: 500 },
+      { no: 16, name: '二師侍者心得', price: 500 },
+      { no: 17, name: '精進料理教室', price: 1000 },
+      { no: 18, name: 'なむなむぬりえ', price: 300 },
+      { no: 19, name: '想い花5枚セット', price: 200 },
+      { no: 20, name: '想い花50枚セット', price: 1000 },
+      { no: 21, name: '僧堂清規', price: 7000 },
+    ];
+
+    const DENOMINATIONS = [10000, 5000, 1000, 500, 100, 50, 10, 5, 1];
+    const DENOMINATION_LABELS = {
+      10000: '一万円', 5000: '五千円', 1000: '千円', 500: '五百円',
+      100: '百円', 50: '五十円', 10: '十円', 5: '五円', 1: '一円'
+    };
+    const STORAGE_KEY = 'sales_calc_app_data';
+
+    // ==========================================
+    // 3. メインアプリケーション
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('sales');
+      const [showToast, setShowToast] = useState(false);
+      
+      const formattedDate = useMemo(() => {
+        return new Date().toLocaleDateString('ja-JP', { 
+          year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' 
+        });
+      }, []);
+
+      const loadSavedData = () => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) return JSON.parse(saved);
+        } catch (e) {
+          console.error('データの読み込みに失敗しました', e);
+        }
+        return null;
+      };
+      
+      const savedData = loadSavedData();
+      const initialCashState = DENOMINATIONS.reduce((acc, curr) => ({ ...acc, [curr]: 0 }), {});
+
+      const [items, setItems] = useState(() => savedData?.items || INITIAL_DATA.map(item => ({ ...item, sold: 0 })));
+      const [startCash, setStartCash] = useState(() => savedData?.startCash || initialCashState);
+      const [endCash, setEndCash] = useState(() => savedData?.endCash || initialCashState);
+
+      const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+      const [saveStatus, setSaveStatus] = useState('saved');
+
+      // オートセーブ
+      useEffect(() => {
+        setSaveStatus('saving');
+        const timer = setTimeout(() => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, startCash, endCash }));
+          setSaveStatus('saved');
+        }, 500);
+        return () => clearTimeout(timer);
+      }, [items, startCash, endCash]);
+
+      const formatPrice = (num) => new Intl.NumberFormat('ja-JP').format(num);
+
+      const handleSoldChange = (no, value) => {
+        let newValue = parseInt(value, 10);
+        if (isNaN(newValue) || newValue < 0) newValue = 0;
+        setItems(prevItems => prevItems.map(item => item.no === no ? { ...item, sold: newValue } : item));
+      };
+
+      const updateSold = (no, delta) => {
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(delta > 0 ? 30 : 20); 
+        }
+        setItems(prevItems => prevItems.map(item => {
+          if (item.no === no) return { ...item, sold: Math.max(0, item.sold + delta) };
+          return item;
+        }));
+      };
+
+      const handleCashChange = (type, denomination, value) => {
+        let num = parseInt(value, 10);
+        if (isNaN(num) || num < 0) num = 0;
+        if (type === 'start') {
+          setStartCash(prev => ({ ...prev, [denomination]: num }));
+        } else {
+          setEndCash(prev => ({ ...prev, [denomination]: num }));
+        }
+      };
+
+      const handleReset = () => {
+        setItems(prevItems => prevItems.map(item => ({ ...item, sold: 0 })));
+        setStartCash(initialCashState);
+        setEndCash(initialCashState);
+        setIsResetModalOpen(false);
+      };
+
+      const calculatedSales = useMemo(() => items.reduce((sum, item) => sum + (item.price * item.sold), 0), [items]);
+      const calcTotalCash = (cashObj) => DENOMINATIONS.reduce((sum, denom) => sum + (denom * cashObj[denom]), 0);
+      const totalStartCash = calcTotalCash(startCash);
+      const totalEndCash = calcTotalCash(endCash);
+      const actualCashSales = Math.max(0, totalEndCash - totalStartCash);
+      const difference = actualCashSales - calculatedSales;
+
+      const generateReportText = () => {
+        const soldItems = items.filter(item => item.sold > 0);
+        
+        let text = `【販促物 日報】 ${formattedDate}\n\n`;
+        text += `■ 売上結果\n`;
+        text += `計算上売上 : ¥${formatPrice(calculatedSales)}\n`;
+        text += `実際の現金 : ¥${formatPrice(actualCashSales)}\n`;
+        text += `過不足　　 : ${difference > 0 ? '+' : ''}¥${formatPrice(difference)}\n\n`;
+        
+        text += `■ 販売内訳\n`;
+        if (soldItems.length === 0) {
+          text += `(販売なし)\n`;
+        } else {
+          soldItems.forEach(item => {
+            text += `・${item.name}: ${item.sold}個 (¥${formatPrice(item.price * item.sold)})\n`;
+          });
+        }
+        
+        text += `\n■ 現金詳細\n`;
+        text += `[お釣り準備金] 合計: ¥${formatPrice(totalStartCash)}\n`;
+        let startCashDetails = [];
+        DENOMINATIONS.forEach(denom => {
+          if (startCash[denom] > 0) startCashDetails.push(`${DENOMINATION_LABELS[denom]}:${startCash[denom]}枚`);
+        });
+        text += startCashDetails.length > 0 ? startCashDetails.join(', ') + '\n' : '(なし)\n';
+
+        text += `\n[終了時の現金] 合計: ¥${formatPrice(totalEndCash)}\n`;
+        let endCashDetails = [];
+        DENOMINATIONS.forEach(denom => {
+          if (endCash[denom] > 0) endCashDetails.push(`${DENOMINATION_LABELS[denom]}:${endCash[denom]}枚`);
+        });
+        text += endCashDetails.length > 0 ? endCashDetails.join(', ') + '\n' : '(なし)\n';
+
+        return text;
+      };
+
+      const handleCopyReport = () => {
+        const reportText = generateReportText();
+        
+        const textarea = document.createElement('textarea');
+        textarea.value = reportText;
+        textarea.style.position = 'fixed'; 
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        
+        try {
+          document.execCommand('copy');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000); 
+        } catch (err) {
+          alert('コピーに失敗しました。');
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      };
+
+
+      return (
+        <div className="h-screen flex flex-col font-sans overflow-hidden select-none">
+          
+          {/* 1. 固定ヘッダー領域 */}
+          <header className="shrink-0 bg-slate-800 text-white px-4 py-3 sm:px-6 shadow-md z-30">
+            <div className="max-w-2xl mx-auto flex flex-col gap-3">
+              <div className="flex justify-between items-start pt-1">
+                <div className="flex flex-col">
+                  <h1 className="text-lg sm:text-xl font-bold tracking-wider leading-none">販促物計算表</h1>
+                  <div className="text-xs text-slate-300 mt-2 font-medium">{formattedDate}</div>
+                  <div className="flex items-center text-[10px] text-slate-400 gap-1 mt-1">
+                    {saveStatus === 'saved' ? (
+                      <><CheckCircle2 size={12} className="text-green-400"/> データ保存済み</>
+                    ) : (
+                      <><Save size={12} className="animate-pulse" /> 保存中...</>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopyReport}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center shadow-sm text-sm font-bold gap-1"
+                      title="日報テキストをコピー"
+                    >
+                      <Copy size={16} />
+                      <span className="hidden sm:inline">日報コピー</span>
+                      <span className="sm:hidden">コピー</span>
+                    </button>
+                    <button
+                      onClick={() => setIsResetModalOpen(true)}
+                      className="p-2 sm:px-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center justify-center shadow-sm text-sm font-bold gap-1"
+                      title="すべてリセット"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-blue-200 font-medium">
+                    コピーしてLINEに貼り付けて上長に報告
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center bg-slate-700/80 px-4 py-3 rounded-xl border border-slate-600 shadow-inner">
+                <span className="text-sm font-bold text-slate-200">売上総計</span>
+                <span className="text-2xl sm:text-3xl font-bold tracking-wide">¥{formatPrice(calculatedSales)}</span>
+              </div>
+            </div>
+          </header>
+
+          {/* 2. 固定タブ領域 */}
+          <div className="shrink-0 bg-white border-b border-gray-200 z-20 shadow-sm relative">
+            <div className="max-w-2xl mx-auto flex px-2 sm:px-4">
+              <button
+                onClick={() => setActiveTab('sales')}
+                className={`flex-1 py-3 flex items-center justify-center gap-2 font-bold transition-colors border-b-[3px] ${
+                  activeTab === 'sales' ? 'text-blue-600 border-blue-600 bg-blue-50/30' : 'text-gray-500 border-transparent hover:bg-gray-50'
+                }`}
+              >
+                <ClipboardList size={18} />
+                販売リスト
+              </button>
+              <button
+                onClick={() => setActiveTab('cash')}
+                className={`flex-1 py-3 flex items-center justify-center gap-2 font-bold transition-colors border-b-[3px] ${
+                  activeTab === 'cash' ? 'text-blue-600 border-blue-600 bg-blue-50/30' : 'text-gray-500 border-transparent hover:bg-gray-50'
+                }`}
+              >
+                <Coins size={18} />
+                現金照合
+              </button>
+            </div>
+          </div>
+
+          {/* 3. スクロール領域 */}
+          <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 relative">
+            <div className="max-w-2xl mx-auto pb-4"> 
+              
+              {/* === 販売リスト タブ === */}
+              {activeTab === 'sales' && (
+                <div className="space-y-4 animate-fade-in">
+                  {items.map((item) => {
+                    const itemTotal = item.price * item.sold;
+                    const hasSold = item.sold > 0;
+                    
+                    return (
+                      <div 
+                        key={item.no} 
+                        className={`p-4 rounded-xl shadow-sm border-2 transition-all duration-200 ${
+                          hasSold ? 'bg-white border-blue-400 shadow-md' : 'bg-white border-gray-100'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1 pr-3">
+                            <div className="text-xs text-gray-500 font-bold mb-1">No.{item.no}</div>
+                            <h3 className="font-bold text-gray-900 text-base sm:text-lg leading-tight line-clamp-2">
+                              {item.name}
+                            </h3>
+                            <div className="text-sm text-gray-500 mt-1">単価: ¥{formatPrice(item.price)}</div>
+                          </div>
+                          
+                          <div className="text-right shrink-0 bg-gray-50/80 px-3 py-2 rounded-lg border border-gray-100">
+                            <div className="text-xs text-gray-500 mb-0.5">小計</div>
+                            <div className={`font-bold text-lg sm:text-xl ${hasSold ? 'text-blue-600' : 'text-gray-400'}`}>
+                              ¥{formatPrice(itemTotal)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 bg-gray-50/50 p-2 sm:p-3 rounded-lg border border-gray-100">
+                          <button
+                            onClick={() => updateSold(item.no, -1)}
+                            disabled={!hasSold}
+                            className={`w-14 sm:w-16 h-14 sm:h-16 shrink-0 flex items-center justify-center rounded-lg transition-colors active:scale-95 ${
+                              hasSold 
+                                ? 'bg-white border border-gray-300 text-gray-600 shadow-sm hover:bg-gray-100' 
+                                : 'bg-transparent text-gray-300 cursor-not-allowed'
+                            }`}
+                          >
+                            <Minus size={24} />
+                          </button>
+                          
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={item.sold === 0 ? '' : item.sold}
+                            placeholder="0"
+                            onChange={(e) => handleSoldChange(item.no, e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                            className={`w-full h-14 sm:h-16 text-center text-2xl sm:text-3xl font-black bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner ${
+                              hasSold ? 'border-blue-200 text-blue-700' : 'border-gray-200 text-gray-800'
+                            }`}
+                          />
+                          
+                          <button
+                            onClick={() => updateSold(item.no, 1)}
+                            className="w-20 sm:w-24 h-14 sm:h-16 shrink-0 flex items-center justify-center bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 active:bg-blue-800 active:scale-95 transition-all"
+                          >
+                            <Plus size={32} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* === 現金照合 タブ === */}
+              {activeTab === 'cash' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className={`p-5 rounded-xl shadow-md border-2 transition-colors ${
+                    calculatedSales === 0 && actualCashSales === 0 
+                      ? 'bg-white border-gray-200' 
+                      : difference === 0 
+                        ? 'bg-green-50 border-green-500' 
+                        : 'bg-red-50 border-red-500'
+                  }`}>
+                    <div className="text-center mb-5">
+                      <h2 className="text-base font-bold text-gray-700 mb-3">照合結果</h2>
+                      
+                      {(calculatedSales > 0 || actualCashSales > 0) ? (
+                        difference === 0 ? (
+                          <div className="flex items-center justify-center gap-2 text-green-700 text-lg font-bold bg-green-100/50 py-3 rounded-lg">
+                            <CheckCircle2 size={24} />
+                            <span>売上と現金が一致！</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-1 text-red-700 text-lg font-bold bg-red-100/50 py-3 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle size={24} />
+                              <span>現金が ¥{formatPrice(Math.abs(difference))}</span>
+                            </div>
+                            <span>{difference > 0 ? '多いです' : '足りません'}</span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-sm text-gray-500 py-2">販売リストと現金の入力を行うと結果が表示されます。</div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                        <div className="text-[10px] sm:text-xs text-gray-500 mb-1">計算上売上(A)</div>
+                        <div className="text-sm sm:text-lg font-bold text-slate-800 break-all">¥{formatPrice(calculatedSales)}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                        <div className="text-[10px] sm:text-xs text-gray-500 mb-1">実際の現金(B)</div>
+                        <div className="text-sm sm:text-lg font-bold text-slate-800 break-all">¥{formatPrice(actualCashSales)}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                        <div className="text-[10px] sm:text-xs text-gray-500 mb-1">過不足(B-A)</div>
+                        <div className={`text-sm sm:text-lg font-bold break-all ${difference === 0 ? 'text-slate-800' : difference > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {difference > 0 ? '+' : ''}¥{formatPrice(difference)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 text-center text-[13px] sm:text-sm font-bold text-gray-600 bg-gray-50/50 py-2 rounded-lg border border-gray-100">
+                      売り上げと一致すればOK
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-200">
+                      <div className="bg-slate-100 p-4 border-b border-slate-200">
+                        <h3 className="font-bold text-slate-700 text-base">お釣り準備金 (朝)</h3>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {DENOMINATIONS.map(denom => (
+                          <div key={`start-${denom}`} className="flex items-center py-1.5 bg-gray-50/50 rounded-lg px-3">
+                            <span className="w-14 sm:w-16 text-right font-bold text-gray-700 mr-3 text-sm shrink-0">
+                              {DENOMINATION_LABELS[denom]}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              value={startCash[denom] === 0 ? '' : startCash[denom]}
+                              placeholder="0"
+                              onChange={(e) => handleCashChange('start', denom, e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              className="w-16 sm:w-20 text-center p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-lg font-bold shadow-inner"
+                            />
+                            <span className="ml-2 text-sm text-gray-500 shrink-0">枚</span>
+                            <span className="flex-1 text-right text-gray-600 font-semibold text-sm break-all pl-2">
+                              ¥{formatPrice(denom * startCash[denom])}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+                        <span className="font-bold text-gray-700">準備金合計</span>
+                        <span className="text-xl font-bold text-slate-800">¥{formatPrice(totalStartCash)}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-200">
+                      <div className="bg-blue-50 p-4 border-b border-blue-100">
+                        <h3 className="font-bold text-blue-800 text-base">終了時の現金 (レジ締め)</h3>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {DENOMINATIONS.map(denom => (
+                          <div key={`end-${denom}`} className="flex items-center py-1.5 bg-blue-50/30 rounded-lg px-3">
+                            <span className="w-14 sm:w-16 text-right font-bold text-gray-700 mr-3 text-sm shrink-0">
+                              {DENOMINATION_LABELS[denom]}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              value={endCash[denom] === 0 ? '' : endCash[denom]}
+                              placeholder="0"
+                              onChange={(e) => handleCashChange('end', denom, e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              className="w-16 sm:w-20 text-center p-2.5 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-lg font-bold shadow-inner"
+                            />
+                            <span className="ml-2 text-sm text-gray-500 shrink-0">枚</span>
+                            <span className="flex-1 text-right text-gray-600 font-semibold text-sm break-all pl-2">
+                              ¥{formatPrice(denom * endCash[denom])}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-blue-50 p-4 border-t border-blue-100 flex justify-between items-center">
+                        <span className="font-bold text-blue-900">終了時合計</span>
+                        <span className="text-xl font-bold text-blue-700">¥{formatPrice(totalEndCash)}</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </main>
+
+          {/* 4. 固定フッター領域 */}
+          <footer className="shrink-0 bg-gray-200 text-gray-500 text-center py-2 text-[10px] sm:text-xs">
+            &copy; {new Date().getFullYear()} Onga-Mirai-Tech
+          </footer>
+
+          {/* コピー完了トースト */}
+          {showToast && (
+            <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 bg-gray-800/95 text-white px-5 py-3 rounded-full shadow-2xl z-50 flex items-center gap-2 toast-enter backdrop-blur-sm border border-gray-700">
+              <CheckCircle2 size={20} className="text-green-400" />
+              <span className="text-sm font-bold whitespace-nowrap">日報をコピーしました</span>
+            </div>
+          )}
+
+          {/* リセット確認モーダル */}
+          {isResetModalOpen && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+              <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-zoom-in">
+                <h3 className="text-lg font-bold text-gray-900 mb-3">確認</h3>
+                <p className="text-gray-600 mb-6">
+                  販売数および入力した現金の枚数をすべて「0」にリセットしますか？
+                  <br/><span className="text-sm text-red-500 font-bold mt-2 inline-block bg-red-50 p-2 rounded">※保存されたデータも初期化されます</span>
+                </p>
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+                  <button
+                    onClick={() => setIsResetModalOpen(false)}
+                    className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-lg text-gray-700 font-bold bg-gray-100 hover:bg-gray-200 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition-colors"
+                  >
+                    リセットする
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Reactアプリのマウント
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
